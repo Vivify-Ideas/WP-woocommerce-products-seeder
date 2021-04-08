@@ -1,5 +1,4 @@
-from faker import Faker
-
+import datetime
 import os
 import sys
 import getopt
@@ -7,6 +6,7 @@ import time
 import mysql.connector
 from mysql.connector import Error
 from mysql.connector import errorcode
+from faker import Faker
 
 # from config import SQL instance connection info, and 
 # our database information to connect to the db
@@ -17,21 +17,21 @@ DB_PASS  = os.environ.get("DB_PASS", None)
 DB_NAME  = os.environ.get("DB_NAME", None)
 
 # configurable defaults for how many variations you want
-LOCATIONS = 8
-EMPLOYEES = 8 # This is number of employees per location, not total
+PRODUCTS = 1000
+# EMPLOYEES = 8 # This is number of employees per location, not total
 
 # parsing/handling commandline options
 auto_create = False
 create_db = False
 
-# Note: By default, each time you run this script, it cleans the tables out
+# Note: By default, each time you run this script, it won't clean the tables out
 # If you want to add more data instead of starting fresh, you can pass the flag '-c'
 # and it won't clean out the database, but will just add more random values to it
-clean_table = True
+clean_table = False
 fullCmdArguments = sys.argv
 argumentList = fullCmdArguments[1:]
 unixOptions = "hH:P:u:p:d:l:e:ac"
-gnuOptions = ["help", "host=", "port=", "user=", "passwd=", "dbname=", "locations=", "employees=", "auto", "dontclean"]
+gnuOptions = ["help", "host=", "port=", "user=", "passwd=", "dbname=", "number=", "auto", "dontclean"]
 
 # probably don't NEED to do all this try/catch, but makes it easier to catch what/where goes wrong sometimes
 # this chunk is just handling arguments
@@ -43,7 +43,7 @@ except getopt.error as err:
 
 for currentArgument, currentValue in arguments:
     if currentArgument in ("-h", "--help"):
-        print ("\nusage: python mysql_faker.py [-h | -P port | -u user | -p passwd | -d dbname | -l locations | -e employees]\nOptions and arguments (and corresponding environment variables):\n-d db\t: database name to connect to or create if it doesn't exist\n-e emps\t: number of employees per location to create\n-h\t: display this help\n-H addr\t: target MySQL database address. Defaults to 127.0.0.1\n-l locs\t: number of locations to create\n-P port\t: port to connect to\n-p pwd\t: password for the database user\n-u usr\t: database user to connect with\n-a\t: automatically create the database if it's missing\n-c\t: DON'T clean out the tables before inserting new random data. Default is to start clean\n\nOther environment variables:\nDB_USER\t: database user to connect with. Overridden by the -u flag\nDB_PASS\t: database password. Overridden by the -p flag.\nDB_NAME\t: database to connect to. Overridden by the -d flag.\nSQL_HOST: Remote MySQL database address. Overridden by the -H flag.\nDB_PORT\t: port for MySQL instance. Overridden by the -P flag.")
+        print ("\nusage: python mysql_faker.py [-h | -P port | -u user | -p passwd | -d dbname | -n number]\nOptions and arguments (and corresponding environment variables):\n-d db\t: database name to connect to or create if it doesn't exist\n-h\t: display this help\n-H addr\t: target MySQL database address. Defaults to 127.0.0.1\n-n num\t: number of products to create\n-P port\t: port to connect to\n-p pwd\t: password for the database user\n-u usr\t: database user to connect with\n-a\t: automatically create the database if it's missing\n-c\t: DON'T clean out the tables before inserting new random data. Default is to start clean\n\nOther environment variables:\nDB_USER\t: database user to connect with. Overridden by the -u flag\nDB_PASS\t: database password. Overridden by the -p flag.\nDB_NAME\t: database to connect to. Overridden by the -d flag.\nSQL_HOST: Remote MySQL database address. Overridden by the -H flag.\nDB_PORT\t: port for MySQL instance. Overridden by the -P flag.")
         sys.exit(0)
 
     if currentArgument in ("-H", "--host"):
@@ -56,10 +56,8 @@ for currentArgument, currentValue in arguments:
         DB_PASS = currentValue
     elif currentArgument in ("-d", "--dbname"):
         DB_NAME = currentValue
-    elif currentArgument in ("-l", "--locations"):
-        LOCATIONS = int(currentValue)
-    elif currentArgument in ("-e", "--employees"):
-        EMPLOYEES = int(currentValue)
+    elif currentArgument in ("-n", "--number"):
+        PRODUCTS = int(currentValue)
     elif currentArgument in ("-a", "--auto"):
         auto_create = True
     elif currentArgument in ("-c", "--dontclean"):
@@ -148,108 +146,75 @@ except Error as e:
         print(e)
         sys.exit(2)
 
-# Create our employee table
-def create_employee_table():
-    employee_config = """
-        CREATE TABLE employee (
-        emp_id INT NOT NULL AUTO_INCREMENT,
-        first_name VARCHAR(40),
-        last_name VARCHAR(40),
-        title VARCHAR(80),
-        office_id INT,
-        pwd CHAR(15),
-        ipaddr CHAR(15),
-        ssn CHAR(11),
-        PRIMARY KEY (emp_id))"""
-    try:
-        mycursor.execute(employee_config)
-    except Error as e:
-        if e.errno != errorcode.ER_TABLE_EXISTS_ERROR:
-            print(e)
-            print(e.errno)
-            sys.exit(2)
 
+# Fill products table with data
+#   `post_author` bigint(20) unsigned NOT NULL DEFAULT 0,
+#   `post_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+#   `post_date_gmt` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+#   `post_content` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+#   `post_title` text COLLATE utf8mb4_unicode_ci NOT NULL,
+#   `post_excerpt` text COLLATE utf8mb4_unicode_ci NOT NULL,
+#   `post_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'publish',
+#   `comment_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+#   `ping_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+#   `post_password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+#   `post_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+#   `to_ping` text COLLATE utf8mb4_unicode_ci NOT NULL,
+#   `pinged` text COLLATE utf8mb4_unicode_ci NOT NULL,
+#   `post_modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+#   `post_modified_gmt` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+#   `post_content_filtered` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+#   `post_parent` bigint(20) unsigned NOT NULL DEFAULT 0,
+#   `guid` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+#   `menu_order` int(11) NOT NULL DEFAULT 0,
+#   `post_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'post',
+#   `post_mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+#   `comment_count` bigint(20) NOT NULL DEFAULT 0,
 
-# Fill employee table with data
-def create_employees():
+def create_products():
     if clean_table:
         try:
-            mycursor.execute("DROP TABLE employee")
+            mycursor.execute("DELETE FROM wp_posts")
         except Error as e:
             if e.errno != errorcode.ER_BAD_TABLE_ERROR:
-                print("There was a problem dropping the existing employee table.")
+                print("There was a problem deleting the existing wp_posts table records.")
                 sys.exit(2)
 
-    create_employee_table()
-
-    for office_id in range(1, LOCATIONS + 1):
-        # generate some random employees for each office location
-        for _ in range(EMPLOYEES):
-            first_name = fake.first_name()
-            last_name = fake.last_name()
-            # Job titles have a lot of whacky things that come through, so be sure we're cleaning
-            # our input a bit. If there's a slash, get rid of it, and if it has an apostrophe, we
-            # need to escape it so it doesn't munge our SQL
-            jobtitle = fake.job().split("/")[0].replace("'", "\\'")
-            pwd = fake.password()
-            ipaddr = fake.ipv4()
-            ssn = fake.ssn()
-            sql_command = (
-                "INSERT INTO employee (first_name, last_name, title, office_id, pwd, ipaddr, ssn) "
-                "VALUES ('{}', '{}', '{}', {}, '{}', '{}', '{}')".format(first_name, last_name, jobtitle, office_id, pwd, ipaddr, ssn)
-            )
-            try:
-                mycursor.execute(sql_command)
-            except Error as e:
-                print (e)
-
-        mydb.commit()
-
-# Create location table
-def create_location_table():
-    location_config = """
-        CREATE TABLE location (
-        office_id INT NOT NULL AUTO_INCREMENT,
-        address VARCHAR(80),
-        city VARCHAR(40),
-        state CHAR(2),
-        PRIMARY KEY (office_id))"""
-    try:
-        mycursor.execute(location_config)
-    except Error as e:
-        if e.errno != errorcode.ER_TABLE_EXISTS_ERROR:
-            print(e)
-            print(e.errno)
-            sys.exit(2)
-
-
-# Fill location table with data
-def generate_locations():
-    if clean_table:
-        try:
-            mycursor.execute("DROP TABLE location")
-        except Error as e:
-            if e.errno != errorcode.ER_BAD_TABLE_ERROR:
-                print("There was a problem dropping the existing location table.")
-                sys.exit(2)
-
-    create_location_table()
-
-    for _ in range(LOCATIONS):
-        address = fake.street_address()
-        city = fake.city()
-        state = fake.state_abbr()
-        sql_command = "INSERT INTO location (address, city, state) VALUES ('{}', '{}', '{}')".format(address, city, state)
+    for product_id in range(1, PRODUCTS + 1):
+        post_author = 2
+        post_date = datetime.datetime.now().isoformat()
+        post_date_gmt = post_date
+        post_content = 'FAKE: ' + fake.text(100)
+        post_content_filtered = post_content
+        post_title = 'FAKE: ' + fake.text(20)
+        post_status = 'publish'
+        comment_status = 'open'
+        ping_status = 'open'
+        post_name = fake.md5(False)
+        post_modified = post_date
+        post_modified_gmt = post_modified
+        post_parent = 0
+        guid = f'https://eklix.tk/proizvod/{post_name}'
+        menu_order = 0
+        post_type = 'product'
+        post_excerpt = ''
+        to_ping = ''
+        pinged = ''
+        comment_count = 0
+        post_mime_type = ''
+        post_password = ''
+        sql_command = (
+            "INSERT INTO wp_posts (post_author, post_date, post_date_gmt, post_content, post_title, post_status, comment_status, ping_status, post_name, post_modified, post_modified_gmt, post_parent, guid, menu_order, post_type, post_excerpt, to_ping, pinged, post_content_filtered, comment_count, post_mime_type, post_password) "
+            "VALUES ({}, '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', {}, '{}', '{}')".format(post_author, post_date, post_date_gmt, post_content, post_title, post_status, comment_status, ping_status, post_name, post_modified, post_modified_gmt, post_parent, guid, menu_order, post_type, post_excerpt, to_ping, pinged, post_content_filtered, comment_count, post_mime_type, post_password)
+        )
         try:
             mycursor.execute(sql_command)
         except Error as e:
-            print(e)
+            print (e)
 
     mydb.commit()
 
-# aaaaaand go!
-print("Beginning data creation of {} locations".format(LOCATIONS))
-generate_locations()
-print("Finished creating locations and beginning to create employee records")
-create_employees()
-print("Finished creating employee records")
+
+print("Beginning data creation of {} products".format(PRODUCTS))
+create_products()
+print("Finished creating product records")

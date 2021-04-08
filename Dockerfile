@@ -1,7 +1,5 @@
 FROM python:3
 
-LABEL maintainer="Gabe Weiss"
-
 COPY ./requirements.txt /app/
 COPY ./mysql_faker.py /app/
 
@@ -22,5 +20,5 @@ ENV DB_NAME "<db name>"
 #ENV SQL_HOST "<database IP>"
 
 # passing the --auto flag to remove interactivity from the script
-CMD [ "python", "mysql_faker.py", "--auto", "--locations=10", "--employees=100", "--dontclean" ]
+CMD [ "python", "mysql_faker.py", "--auto", "--number=1000", "--dontclean" ]
 
